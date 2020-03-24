@@ -21,7 +21,10 @@ import wx.richtext as rt
 from openplotterSettings import conf
 from openplotterSettings import language
 from openplotterSettings import platform
-from .version import version
+if os.path.dirname(os.path.abspath(__file__))[0:4] == '/usr':
+	from .version import version
+else:
+	import version
 
 class MyFrame(wx.Frame):
 	def __init__(self):
@@ -37,18 +40,35 @@ class MyFrame(wx.Frame):
 		install = ''
 		uninstall = ''
 		if self.platform.skPort:
+			edit = ''
+			install = self.platform.admin+' python3 '+self.currentdir+'/installKapacitorChronograf.py'
+			uninstall = self.platform.admin+' python3 '+self.currentdir+'/uninstallKapacitorChronograf.py'
+			settings = self.platform.admin+' python3 '+self.currentdir+'/editSystemd.py kapacitor'
+		app = {
+		'name': 'Chronograf/Kapacitor',
+		'show': "http://localhost:8888",
+		'edit': edit,
+		'included': 'no',
+		'plugin': '',
+		'install': install,
+		'uninstall': uninstall,
+		'settings': settings,
+		}
+		self.appsDict.append(app)
+		if self.platform.skPort:
 			edit = self.platform.http+'localhost:'+self.platform.skPort+'/admin/#/serverConfiguration/plugins/signalk-to-influxdb'
 			install = self.platform.admin+' python3 '+self.currentdir+'/installInfluxdbGrafana.py'
-			uninstall = self.platform.admin+' python3 '+self.currentdir+'/uninstallInfluxdbGrafana.py'			
+			uninstall = self.platform.admin+' python3 '+self.currentdir+'/uninstallInfluxdbGrafana.py'
+			settings = self.platform.admin+' python3 '+self.currentdir+'/editSystemd.py influxdb && ' + self.platform.admin+' python3 '+self.currentdir+'/editSystemd.py grafana-server'
 		app = {
-		'name': 'Influxdb/Chronograf/Kapacitor/Grafana',
+		'name': 'Influxdb/Grafana',
 		'show': "http://localhost:3001",
 		'edit': edit,
 		'included': 'no',
 		'plugin': 'signalk-to-influxdb',
 		'install': install,
 		'uninstall': uninstall,
-		'settings': 'http://localhost:8888',
+		'settings': settings,
 		}
 		self.appsDict.append(app)
 
@@ -114,7 +134,11 @@ class MyFrame(wx.Frame):
 		}
 		self.appsDict.append(app)
 
-		wx.Frame.__init__(self, None, title=_('Dashboards')+' '+version, size=(800,444))
+		if os.path.dirname(os.path.abspath(__file__))[0:4] == '/usr': 
+			v = version
+		else: v = version.version
+
+		wx.Frame.__init__(self, None, title=_('Dashboards')+' '+v, size=(800,444))
 		self.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
 		icon = wx.Icon(self.currentdir+"/data/openplotter-dashboards.png", wx.BITMAP_TYPE_PNG)
 		self.SetIcon(icon)
@@ -226,8 +250,17 @@ class MyFrame(wx.Frame):
 				if i['included'] == 'yes': self.listApps.SetItem(item, 1, _('installed'))
 				elif self.platform.isSKpluginInstalled(i['plugin']): self.listApps.SetItem(item, 1, _('installed'))
 				else:
-					self.listApps.SetItem(item, 1, _('not installed'))
-					self.listApps.SetItemBackgroundColour(item,(200,200,200))
+					process = i['name'].split('/')
+					exists=True
+					for j in process:
+						command = 'systemctl show ' + j.lower() + ' --no-page'
+						output = subprocess.check_output(command.split(),universal_newlines=True)
+						if not 'UnitFileState=' in output:	exists=False
+					if exists:
+						self.listApps.SetItem(item, 1, _('installed'))
+					else:
+						self.listApps.SetItem(item, 1, _('not installed'))
+						self.listApps.SetItemBackgroundColour(item,(200,200,200))
 			else:
 				self.listApps.SetItem(item, 1, _('not installed'))
 				self.listApps.SetItemBackgroundColour(item,(200,200,200))
@@ -297,8 +330,12 @@ class MyFrame(wx.Frame):
 		index = self.listApps.GetFirstSelected()
 		if index == -1: return
 		apps = list(reversed(self.appsDict))
-		webbrowser.open(apps[index]['settings'], new=2)
-
+		command = apps[index]['settings']
+		if not command:
+			return
+		subprocess.call(command, shell=True)
+		#self.restart_SK(0)
+		
 	def OnEditButton(self, e):
 		index = self.listApps.GetFirstSelected()
 		if index == -1: return

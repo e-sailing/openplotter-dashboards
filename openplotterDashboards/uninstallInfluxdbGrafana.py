@@ -29,14 +29,12 @@ def main():
 	try:
 		platform2 = platform.Platform()
 
-		subprocess.call(['systemctl', 'disable', 'kapacitor.service'])
-		subprocess.call(['systemctl', 'stop', 'kapacitor'])
 		subprocess.call(['systemctl', 'disable', 'grafana-server.service'])
 		subprocess.call(['systemctl', 'stop', 'grafana-server'])
 		subprocess.call(['systemctl', 'disable', 'influxdb.service'])
 		subprocess.call(['systemctl', 'stop', 'influxdb'])
 
-		subprocess.call(['apt', '-y', 'autoremove', 'grafana', 'influxdb', 'kapacitor', 'chronograf'])
+		subprocess.call(['apt', '-y', 'autoremove', 'grafana', 'influxdb'])
 
 		subprocess.call(['npm', 'uninstall', '--verbose', 'signalk-to-influxdb', '--save'], cwd = platform2.skDir)
 		
